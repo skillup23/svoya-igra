@@ -25,9 +25,10 @@ export const gameData = {
               cost: 200,
               type: "image",
               special: null,
-              src: "/media/sample-poster.jpg", // Файл лежит в public/media/
-              question: "Назовите фильм по этому кадру.",
-              answer: "Начало (Inception)",
+              src: "/media/sample-poster.jpg", // Исходная картинка вопроса
+              answerImage: "/media/answer-poster.jpg", // Картинка, которая появится при клике «Показать ответ»
+              question: "Что скрыто под цензурой на этом постере?",
+              answer: "Шляпа главного героя", // Текстовое пояснение (тоже покажется внизу)
             },
             {
               id: "r1_c1_q3",

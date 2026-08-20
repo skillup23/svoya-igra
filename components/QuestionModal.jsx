@@ -9,6 +9,7 @@ import {
   EyeOff,
   Flame,
   Gift,
+  Maximize2,
   Minus,
   Pause,
   Play,
@@ -16,7 +17,7 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export default function QuestionModal({
   question,
@@ -28,13 +29,14 @@ export default function QuestionModal({
   const [showAnswer, setShowAnswer] = useState(false);
   const [customCost, setCustomCost] = useState(question?.cost || 0);
   const [isEditingCost, setIsEditingCost] = useState(false);
+  const [fullscreenImageSrc, setFullscreenImageSrc] = useState(null);
 
   // Состояние таймера
-  const DEFAULT_TIME = 20; // 20 секунд по умолчанию
+  const DEFAULT_TIME = 20;
   const [timeLeft, setTimeLeft] = useState(DEFAULT_TIME);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
 
-  // Звук при открытии спец-вопросов
+  // Звук при открытии
   useEffect(() => {
     if (question?.special) {
       sounds.playSpecial();
@@ -43,7 +45,7 @@ export default function QuestionModal({
     }
   }, [question]);
 
-  // Логика тиканья таймера без синхронного setState в теле эффекта
+  // Логика таймера
   useEffect(() => {
     if (!isTimerRunning) return;
 
@@ -62,19 +64,29 @@ export default function QuestionModal({
     return () => clearInterval(timer);
   }, [isTimerRunning]);
 
+  const handleCorrect = useCallback(
+    (teamId) => {
+      sounds.playCorrect();
+      onAwardScore(teamId, customCost);
+    },
+    [customCost, onAwardScore],
+  );
+
+  const handleWrong = useCallback(
+    (teamId) => {
+      sounds.playWrong();
+      onAwardScore(teamId, -customCost);
+    },
+    [customCost, onAwardScore],
+  );
+
   if (!question) return null;
 
-  const handleCorrect = (teamId) => {
-    sounds.playCorrect();
-    onAwardScore(teamId, customCost);
-  };
-
-  const handleWrong = (teamId) => {
-    sounds.playWrong();
-    onAwardScore(teamId, -customCost);
-  };
-
   const progressPercent = (timeLeft / DEFAULT_TIME) * 100;
+
+  // Если открыт ответ и у вопроса есть answerImage — показываем его, иначе исходный src
+  const currentDisplayedImage =
+    showAnswer && question.answerImage ? question.answerImage : question.src;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-between bg-slate-950/95 backdrop-blur-xl p-6 md:p-8 animate-in fade-in duration-200">
@@ -97,7 +109,7 @@ export default function QuestionModal({
             ) : (
               <span
                 onClick={() => setIsEditingCost(true)}
-                title="Нажмите, чтобы изменить стоимость (например, для аукциона)"
+                title="Кликните для изменения ставки"
                 className="bg-amber-500/20 border border-amber-400/50 text-amber-300 text-2xl font-black px-4 py-1 rounded-xl cursor-pointer hover:border-amber-300 transition"
               >
                 {customCost} очков
@@ -119,7 +131,6 @@ export default function QuestionModal({
 
         {/* Таймер + Закрытие */}
         <div className="flex items-center gap-4">
-          {/* Контроллер таймера */}
           <div className="flex items-center gap-2 bg-slate-900 border border-slate-700 px-3 py-1.5 rounded-2xl">
             <Clock
               size={18}
@@ -130,13 +141,16 @@ export default function QuestionModal({
               }
             />
             <span
-              className={`text-xl font-black tabular-nums ${timeLeft <= 5 ? "text-rose-400" : "text-white"}`}
+              className={`text-xl font-black tabular-nums ${
+                timeLeft <= 5 ? "text-rose-400" : "text-white"
+              }`}
             >
               {timeLeft}с
             </span>
             <button
               onClick={() => setIsTimerRunning(!isTimerRunning)}
               className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-300 transition"
+              title="Старт/Пауза"
             >
               {isTimerRunning ? <Pause size={16} /> : <Play size={16} />}
             </button>
@@ -155,14 +169,14 @@ export default function QuestionModal({
           <button
             onClick={onClose}
             className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-2xl transition border border-slate-700 active:scale-95"
-            title="Закрыть и вернуться к табло"
+            title="Закрыть вопрос"
           >
             <X size={26} />
           </button>
         </div>
       </div>
 
-      {/* Полоса прогресса таймера */}
+      {/* Полоса таймера */}
       <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden mt-2">
         <div
           className={`h-full transition-all duration-1000 ${
@@ -172,18 +186,35 @@ export default function QuestionModal({
         />
       </div>
 
-      {/* Центральная зона: Вопрос / Картинка / Аудио */}
+      {/* Контентная зона */}
       <div className="flex-1 flex flex-col items-center justify-center max-w-5xl mx-auto w-full my-4 text-center overflow-y-auto px-4">
-        {question.type === "image" && question.src && (
-          <div className="mb-4 max-h-[60vh] rounded-2xl overflow-hidden border-2 border-slate-700 shadow-2xl">
-            <img
-              src={question.src}
-              alt="Иллюстрация к вопросу"
-              className="max-h-[60vh] w-auto object-contain mx-auto"
-            />
-          </div>
-        )}
+        {/* Картинка вопроса или картинка ответа */}
+        {(question.type === "image" || (showAnswer && question.answerImage)) &&
+          currentDisplayedImage && (
+            <div className="relative group mb-4 max-h-[44vh] rounded-2xl overflow-hidden border-2 border-slate-700 shadow-2xl bg-black/40">
+              <img
+                src={currentDisplayedImage}
+                alt="Иллюстрация"
+                className="max-h-[44vh] w-auto object-contain mx-auto cursor-pointer transition duration-300 group-hover:scale-[1.01]"
+                onClick={() => setFullscreenImageSrc(currentDisplayedImage)}
+              />
+              {/* Кнопка поверх картинки для раскрытия на весь экран */}
+              <button
+                onClick={() => setFullscreenImageSrc(currentDisplayedImage)}
+                className="absolute top-3 right-3 p-2.5 bg-slate-900/80 hover:bg-slate-900 text-white rounded-xl backdrop-blur-md opacity-0 group-hover:opacity-100 transition shadow-lg border border-slate-600/60"
+                title="Открыть картинку на весь экран"
+              >
+                <Maximize2 size={20} />
+              </button>
+              {showAnswer && question.answerImage && (
+                <span className="absolute bottom-3 left-3 bg-emerald-600/90 text-white text-xs font-black uppercase tracking-wider px-3 py-1 rounded-lg backdrop-blur-sm shadow">
+                  Картинка-Ответ
+                </span>
+              )}
+            </div>
+          )}
 
+        {/* Аудио */}
         {question.type === "audio" && question.src && (
           <div className="mb-4 flex flex-col items-center gap-3 p-5 bg-slate-900 border border-slate-700 rounded-3xl shadow-xl w-full max-w-md">
             <div className="flex items-center gap-3 text-amber-400 font-bold text-lg">
@@ -193,16 +224,18 @@ export default function QuestionModal({
           </div>
         )}
 
-        <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-white leading-tight drop-shadow-md">
+        {/* Текст вопроса */}
+        <h2 className="text-3xl md:text-5xl lg:text-6xl font-extrabold text-white leading-tight drop-shadow-md">
           {question.question}
         </h2>
 
-        {showAnswer && (
-          <div className="mt-6 p-5 bg-emerald-950/60 border-2 border-emerald-500/80 rounded-2xl max-w-3xl w-full animate-in zoom-in-95 duration-200">
+        {/* Текстовый ответ */}
+        {showAnswer && question.answer && (
+          <div className="mt-5 p-4 bg-emerald-950/60 border-2 border-emerald-500/80 rounded-2xl max-w-3xl w-full animate-in zoom-in-95 duration-200">
             <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest block mb-1">
               Правильный ответ:
             </span>
-            <p className="text-2xl md:text-4xl font-black text-emerald-200">
+            <p className="text-2xl md:text-3xl font-black text-emerald-200">
               {question.answer}
             </p>
           </div>
@@ -252,6 +285,33 @@ export default function QuestionModal({
           ))}
         </div>
       </div>
+
+      {/* Полноэкранный просмотрщик картинки (LightBox) */}
+      {fullscreenImageSrc && (
+        <div
+          onClick={() => setFullscreenImageSrc(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-2xl p-4 md:p-8 animate-in fade-in zoom-in-95 duration-200 cursor-zoom-out"
+        >
+          {/* Крестик закрытия картинки */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setFullscreenImageSrc(null);
+            }}
+            className="absolute top-6 right-6 p-4 bg-slate-800/90 hover:bg-slate-700 text-white rounded-full transition border border-slate-600 shadow-2xl cursor-pointer"
+            title="Закрыть изображение"
+          >
+            <X size={32} />
+          </button>
+
+          <img
+            src={fullscreenImageSrc}
+            alt="Полноэкранное изображение"
+            className="max-h-[92vh] max-w-[92vw] object-contain rounded-xl shadow-2xl select-none"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }

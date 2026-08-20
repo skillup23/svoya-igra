@@ -14,7 +14,7 @@ import {
   RotateCcw,
   Trophy,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 const INITIAL_TEAMS = [
   { id: 1, name: "Команда 1", score: 0 },
@@ -22,41 +22,45 @@ const INITIAL_TEAMS = [
   { id: 3, name: "Команда 3", score: 0 },
 ];
 
+const emptySubscribe = () => () => {};
+
+// Хук безопасного определения клиентского монтирования без вызова setState
+function useMounted() {
+  return useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
+}
+
 export default function Home() {
-  const [teams, setTeams] = useState(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("svoya_igra_state");
-        if (saved) return JSON.parse(saved).teams || INITIAL_TEAMS;
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    return INITIAL_TEAMS;
-  });
+  const isMounted = useMounted();
 
-  const [playedQuestions, setPlayedQuestions] = useState(() => {
+  // Ленивая инициализация состояния из localStorage
+  const [gameState, setGameState] = useState(() => {
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem("svoya_igra_state");
-        if (saved) return JSON.parse(saved).playedQuestions || [];
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return {
+            teams: parsed.teams || INITIAL_TEAMS,
+            playedQuestions: parsed.playedQuestions || [],
+            currentRoundIndex:
+              typeof parsed.currentRoundIndex === "number"
+                ? parsed.currentRoundIndex
+                : 0,
+          };
+        }
       } catch (e) {
-        console.error(e);
+        console.error("Ошибка чтения localStorage:", e);
       }
     }
-    return [];
-  });
-
-  const [currentRoundIndex, setCurrentRoundIndex] = useState(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("svoya_igra_state");
-        if (saved) return JSON.parse(saved).currentRoundIndex || 0;
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    return 0;
+    return {
+      teams: INITIAL_TEAMS,
+      playedQuestions: [],
+      currentRoundIndex: 0,
+    };
   });
 
   const [activeQuestion, setActiveQuestion] = useState(null);
@@ -64,13 +68,12 @@ export default function Home() {
   const [isGameOver, setIsGameOver] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Синхронизация состояния с localStorage
+  // Синхронизация с localStorage при изменении состояния игры
   useEffect(() => {
-    localStorage.setItem(
-      "svoya_igra_state",
-      JSON.stringify({ teams, playedQuestions, currentRoundIndex }),
-    );
-  }, [teams, playedQuestions, currentRoundIndex]);
+    if (isMounted) {
+      localStorage.setItem("svoya_igra_state", JSON.stringify(gameState));
+    }
+  }, [gameState, isMounted]);
 
   // Запуск конфетти при финале
   useEffect(() => {
@@ -83,11 +86,10 @@ export default function Home() {
     }
   }, [isGameOver]);
 
-  // Переключение Fullscreen
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch((err) => {
-        console.error("Ошибка перехода в полноэкранный режим:", err);
+        console.error("Ошибка полноэкранного режима:", err);
       });
       setIsFullscreen(true);
     } else {
@@ -98,9 +100,10 @@ export default function Home() {
     }
   };
 
+  const { teams, playedQuestions, currentRoundIndex } = gameState;
   const currentRound = gameData.rounds[currentRoundIndex];
 
-  // Подсчет сыгранных вопросов в текущем раунде
+  // Подсчет вопросов в раунде
   const currentRoundQuestionIds =
     currentRound?.categories.flatMap((cat) => cat.questions.map((q) => q.id)) ||
     [];
@@ -110,15 +113,21 @@ export default function Home() {
   const currentRoundTotalCount = currentRoundQuestionIds.length;
 
   const handleUpdateScore = (teamId, delta) => {
-    setTeams((prev) =>
-      prev.map((t) => (t.id === teamId ? { ...t, score: t.score + delta } : t)),
-    );
+    setGameState((prev) => ({
+      ...prev,
+      teams: prev.teams.map((t) =>
+        t.id === teamId ? { ...t, score: t.score + delta } : t,
+      ),
+    }));
   };
 
   const handleUpdateTeamName = (teamId, newName) => {
-    setTeams((prev) =>
-      prev.map((t) => (t.id === teamId ? { ...t, name: newName } : t)),
-    );
+    setGameState((prev) => ({
+      ...prev,
+      teams: prev.teams.map((t) =>
+        t.id === teamId ? { ...t, name: newName } : t,
+      ),
+    }));
   };
 
   const handleSelectQuestion = (question, categoryName) => {
@@ -132,7 +141,10 @@ export default function Home() {
 
   const handleCloseQuestion = () => {
     if (activeQuestion) {
-      setPlayedQuestions((prev) => [...prev, activeQuestion.id]);
+      setGameState((prev) => ({
+        ...prev,
+        playedQuestions: [...prev.playedQuestions, activeQuestion.id],
+      }));
       setActiveQuestion(null);
       setActiveCategoryName("");
     }
@@ -140,15 +152,28 @@ export default function Home() {
 
   const handleResetGame = () => {
     if (confirm("Вы уверены, что хотите сбросить всю игру и счёт?")) {
-      setTeams(INITIAL_TEAMS);
-      setPlayedQuestions([]);
-      setCurrentRoundIndex(0);
+      setGameState({
+        teams: INITIAL_TEAMS,
+        playedQuestions: [],
+        currentRoundIndex: 0,
+      });
       setIsGameOver(false);
       localStorage.removeItem("svoya_igra_state");
     }
   };
 
   const winner = [...teams].sort((a, b) => b.score - a.score)[0];
+
+  // До завершения первой гидратации рендерим каркас без расхождений
+  if (!isMounted) {
+    return (
+      <main className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
+        <span className="text-xl font-bold tracking-widest text-amber-400 uppercase animate-pulse">
+          Загрузка «Своя Игра»...
+        </span>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-slate-950 via-blue-950 to-slate-950 text-slate-100 flex flex-col justify-between py-3 px-2 select-none">
@@ -172,7 +197,10 @@ export default function Home() {
         <div className="flex items-center gap-2">
           <button
             onClick={() =>
-              setCurrentRoundIndex((prev) => Math.max(0, prev - 1))
+              setGameState((prev) => ({
+                ...prev,
+                currentRoundIndex: Math.max(0, prev.currentRoundIndex - 1),
+              }))
             }
             disabled={currentRoundIndex === 0 || isGameOver}
             className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 transition border border-slate-700 active:scale-95"
@@ -183,7 +211,12 @@ export default function Home() {
 
           {currentRoundIndex < gameData.rounds.length - 1 ? (
             <button
-              onClick={() => setCurrentRoundIndex((prev) => prev + 1)}
+              onClick={() =>
+                setGameState((prev) => ({
+                  ...prev,
+                  currentRoundIndex: prev.currentRoundIndex + 1,
+                }))
+              }
               className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-sm transition shadow-lg active:scale-95"
             >
               Следующий раунд <ChevronRight size={18} />
@@ -216,7 +249,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Центральное поле */}
+      {/* Центральное игровое поле */}
       <section className="flex-1 flex flex-col justify-center items-center my-auto">
         {isGameOver ? (
           <div className="flex flex-col items-center text-center p-8 bg-slate-900/80 border-2 border-amber-400/60 rounded-3xl backdrop-blur-xl shadow-2xl max-w-2xl w-full mx-4 animate-in zoom-in-95">
@@ -255,7 +288,7 @@ export default function Home() {
         )}
       </section>
 
-      {/* Панель с командами */}
+      {/* Нижняя панель команд */}
       <footer className="w-full">
         <Scoreboard
           teams={teams}
@@ -264,7 +297,7 @@ export default function Home() {
         />
       </footer>
 
-      {/* Модалка активного вопроса */}
+      {/* Модалка вопроса */}
       {activeQuestion && (
         <QuestionModal
           question={activeQuestion}
