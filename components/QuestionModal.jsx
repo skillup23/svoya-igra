@@ -225,7 +225,7 @@ export default function QuestionModal({
         )}
 
         {/* Текст вопроса */}
-        <h2 className="text-3xl md:text-5xl lg:text-6xl font-extrabold text-white leading-tight drop-shadow-md">
+        <h2 className="text-2xl md:text-4xl lg:text-5xl font-extrabold text-white leading-none drop-shadow-md">
           {question.question}
         </h2>
 
@@ -298,7 +298,7 @@ export default function QuestionModal({
               e.stopPropagation();
               setFullscreenImageSrc(null);
             }}
-            className="absolute top-6 right-6 p-4 bg-slate-800/90 hover:bg-slate-700 text-white rounded-full transition border border-slate-600 shadow-2xl cursor-pointer"
+            className="absolute top-6  right-6 p-4 bg-slate-800/90 hover:bg-slate-700 text-white rounded-full transition border border-slate-600 shadow-2xl cursor-pointer"
             title="Закрыть изображение"
           >
             <X size={32} />
@@ -307,7 +307,7 @@ export default function QuestionModal({
           <img
             src={fullscreenImageSrc}
             alt="Полноэкранное изображение"
-            className="max-h-[92vh] max-w-[92vw] object-contain rounded-xl shadow-2xl select-none"
+            className="max-h-[92vh] max-w-[92vw] object-contain rounded-xl shadow-2xl select-none zoom-120"
             onClick={(e) => e.stopPropagation()}
           />
         </div>
