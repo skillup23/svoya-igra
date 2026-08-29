@@ -298,7 +298,7 @@ export default function QuestionModal({
               e.stopPropagation();
               setFullscreenImageSrc(null);
             }}
-            className="absolute top-6  right-6 p-4 bg-slate-800/90 hover:bg-slate-700 text-white rounded-full transition border border-slate-600 shadow-2xl cursor-pointer"
+            className="absolute top-30  right-6 p-4 bg-slate-800/90 hover:bg-slate-700 text-white rounded-full transition border border-slate-600 shadow-2xl cursor-pointer"
             title="Закрыть изображение"
           >
             <X size={32} />
