@@ -84,9 +84,18 @@ export default function QuestionModal({
 
   const progressPercent = (timeLeft / DEFAULT_TIME) * 100;
 
-  // Если открыт ответ и у вопроса есть answerImage — показываем его, иначе исходный src
-  const currentDisplayedImage =
-    showAnswer && question.answerImage ? question.answerImage : question.src;
+  // Строго определяем, какое медиа показывать
+  const isImageType = question.type === "image";
+  const isVideoType = question.type === "video";
+  const isAudioType = question.type === "audio";
+
+  const currentImage =
+    isImageType &&
+    (showAnswer && question.answerImage ? question.answerImage : question.src);
+
+  const currentVideo =
+    isVideoType &&
+    (showAnswer && question.answerVideo ? question.answerVideo : question.src);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-between bg-slate-950/95 backdrop-blur-xl p-6 md:p-8 animate-in fade-in duration-200">
@@ -188,34 +197,49 @@ export default function QuestionModal({
 
       {/* Контентная зона */}
       <div className="flex-1 flex flex-col items-center justify-center max-w-5xl mx-auto w-full my-4 text-center overflow-y-auto px-4">
-        {/* Картинка вопроса или картинка ответа */}
-        {(question.type === "image" || (showAnswer && question.answerImage)) &&
-          currentDisplayedImage && (
-            <div className="relative group mb-4 max-h-[44vh] rounded-2xl overflow-hidden border-2 border-slate-700 shadow-2xl bg-black/40">
-              <img
-                src={currentDisplayedImage}
-                alt="Иллюстрация"
-                className="max-h-[44vh] w-auto object-contain mx-auto cursor-pointer transition duration-300 group-hover:scale-[1.01]"
-                onClick={() => setFullscreenImageSrc(currentDisplayedImage)}
-              />
-              {/* Кнопка поверх картинки для раскрытия на весь экран */}
-              <button
-                onClick={() => setFullscreenImageSrc(currentDisplayedImage)}
-                className="absolute top-3 right-3 p-2.5 bg-slate-900/80 hover:bg-slate-900 text-white rounded-xl backdrop-blur-md opacity-0 group-hover:opacity-100 transition shadow-lg border border-slate-600/60"
-                title="Открыть картинку на весь экран"
-              >
-                <Maximize2 size={20} />
-              </button>
-              {showAnswer && question.answerImage && (
-                <span className="absolute bottom-3 left-3 bg-emerald-600/90 text-white text-xs font-black uppercase tracking-wider px-3 py-1 rounded-lg backdrop-blur-sm shadow">
-                  Картинка-Ответ
-                </span>
-              )}
-            </div>
-          )}
+        {/* Картинка (ТОЛЬКО для type: "image") */}
+        {isImageType && currentImage && (
+          <div className="relative group mb-4 max-h-[44vh] rounded-2xl overflow-hidden border-2 border-slate-700 shadow-2xl bg-black/40">
+            <img
+              src={currentImage}
+              alt="Иллюстрация"
+              className="max-h-[44vh] w-auto object-contain mx-auto cursor-pointer transition duration-300 group-hover:scale-[1.01]"
+              onClick={() => setFullscreenImageSrc(currentImage)}
+            />
+            <button
+              onClick={() => setFullscreenImageSrc(currentImage)}
+              className="absolute top-3 right-3 p-2.5 bg-slate-900/80 hover:bg-slate-900 text-white rounded-xl backdrop-blur-md opacity-0 group-hover:opacity-100 transition shadow-lg border border-slate-600/60"
+              title="Открыть картинку на весь экран"
+            >
+              <Maximize2 size={20} />
+            </button>
+            {showAnswer && question.answerImage && (
+              <span className="absolute bottom-3 left-3 bg-emerald-600/90 text-white text-xs font-black uppercase tracking-wider px-3 py-1 rounded-lg backdrop-blur-sm shadow">
+                Картинка-Ответ
+              </span>
+            )}
+          </div>
+        )}
 
-        {/* Аудио */}
-        {question.type === "audio" && question.src && (
+        {/* Видео (ТОЛЬКО для type: "video") */}
+        {isVideoType && currentVideo && (
+          <div className="relative mb-4 max-h-[44vh] w-full max-w-3xl rounded-2xl overflow-hidden border-2 border-slate-700 shadow-2xl bg-black flex flex-col items-center">
+            <video
+              key={currentVideo} // Гарантирует полную перезагрузку при смене видео
+              controls
+              src={currentVideo}
+              className="max-h-[44vh] w-full object-contain"
+            />
+            {showAnswer && question.answerVideo && (
+              <span className="absolute top-3 left-3 bg-emerald-600/90 text-white text-xs font-black uppercase tracking-wider px-3 py-1 rounded-lg backdrop-blur-sm shadow z-10">
+                Видео-Ответ
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Аудио (ТОЛЬКО для type: "audio") */}
+        {isAudioType && question.src && (
           <div className="mb-4 flex flex-col items-center gap-3 p-5 bg-slate-900 border border-slate-700 rounded-3xl shadow-xl w-full max-w-md">
             <div className="flex items-center gap-3 text-amber-400 font-bold text-lg">
               <Volume2 size={24} className="animate-bounce" /> Аудиозапись
@@ -225,7 +249,7 @@ export default function QuestionModal({
         )}
 
         {/* Текст вопроса */}
-        <h2 className="text-2xl md:text-4xl lg:text-5xl font-extrabold text-white leading-none drop-shadow-md">
+        <h2 className="text-3xl md:text-4xl lg:text-5xl font-extrabold text-white leading-none drop-shadow-md">
           {question.question}
         </h2>
 
@@ -286,19 +310,18 @@ export default function QuestionModal({
         </div>
       </div>
 
-      {/* Полноэкранный просмотрщик картинки (LightBox) */}
+      {/* Полноэкранный LightBox (ТОЛЬКО для картинок) */}
       {fullscreenImageSrc && (
         <div
           onClick={() => setFullscreenImageSrc(null)}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-2xl p-4 md:p-8 animate-in fade-in zoom-in-95 duration-200 cursor-zoom-out"
         >
-          {/* Крестик закрытия картинки */}
           <button
             onClick={(e) => {
               e.stopPropagation();
               setFullscreenImageSrc(null);
             }}
-            className="absolute top-30  right-6 p-4 bg-slate-800/90 hover:bg-slate-700 text-white rounded-full transition border border-slate-600 shadow-2xl cursor-pointer"
+            className="absolute top-6 right-6 p-4 bg-slate-800/90 hover:bg-slate-700 text-white rounded-full transition border border-slate-600 shadow-2xl cursor-pointer"
             title="Закрыть изображение"
           >
             <X size={32} />
