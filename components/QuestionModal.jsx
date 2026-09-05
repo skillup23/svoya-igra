@@ -253,15 +253,35 @@ export default function QuestionModal({
           {question.question}
         </h2>
 
-        {/* Текстовый ответ */}
-        {showAnswer && question.answer && (
-          <div className="mt-5 p-4 bg-emerald-950/60 border-2 border-emerald-500/80 rounded-2xl max-w-3xl w-full animate-in zoom-in-95 duration-200">
-            <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest block mb-1">
+        {/* Блок ответа (текст и/или аудио) */}
+        {showAnswer && (
+          <div className="mt-5 p-5 bg-emerald-950/60 border-2 border-emerald-500/80 rounded-2xl max-w-3xl w-full flex flex-col items-center gap-3 animate-in zoom-in-95 duration-200">
+            <span className="text-xs font-bold text-emerald-400 uppercase tracking-widest block">
               Правильный ответ:
             </span>
-            <p className="text-2xl md:text-3xl font-black text-emerald-200">
-              {question.answer}
-            </p>
+
+            {/* Аудио-ответ (если задан) */}
+            {question.answerAudio && (
+              <div className="w-full max-w-md flex flex-col items-center gap-2 p-3 bg-slate-900/90 border border-emerald-500/50 rounded-2xl shadow-lg my-1">
+                <div className="flex items-center gap-2 text-emerald-300 font-bold text-sm">
+                  <Volume2 size={18} className="animate-pulse" /> Звуковой ответ
+                </div>
+                <audio
+                  key={question.answerAudio}
+                  controls
+                  autoPlay
+                  src={question.answerAudio}
+                  className="w-full"
+                />
+              </div>
+            )}
+
+            {/* Текстовое пояснение ответа (если есть) */}
+            {question.answer && (
+              <p className="text-2xl md:text-3xl font-black text-emerald-200">
+                {question.answer}
+              </p>
+            )}
           </div>
         )}
       </div>
